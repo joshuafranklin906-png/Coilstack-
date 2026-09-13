@@ -1,0 +1,1201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>COILSTACK — snake vs. falling blocks</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-deep: #0b0e14;
+    --bg-panel: #12161f;
+    --grid-line: #1c2230;
+    --amber: #ffb32e;
+    --cyan: #4fd8e0;
+    --magenta: #ff5d8f;
+    --violet: #8b7bff;
+    --lime: #8be04f;
+    --text-dim: #6b7488;
+    --text-bright: #e8ecf4;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    background: radial-gradient(ellipse at 50% -10%, #1a2033 0%, var(--bg-deep) 60%);
+    font-family: 'Courier New', monospace; color: var(--text-bright); padding: 24px;
+  }
+  .cabinet {
+    display: flex; gap: 28px; align-items: flex-start;
+    background: linear-gradient(180deg, #151a26, #0e1219);
+    border: 1px solid #232a3a; border-radius: 18px; padding: 22px;
+    box-shadow: 0 40px 80px -20px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.03);
+    width: 700px; max-width: 92vw;
+  }
+
+  /* ---------- screens ---------- */
+  .screen { display: none; width: 100%; }
+  .screen.active { display: flex; }
+
+  /* ---------- menu ---------- */
+  #screen-menu, #screen-settings, #screen-daily, #screen-highscores {
+    flex-direction: column; align-items: center; gap: 6px; padding: 10px 20px;
+  }
+  .menu-title { text-align: center; margin-bottom: 18px; }
+  .menu-title h1 { font-size: 26px; letter-spacing: 8px; margin: 0 0 6px 0; }
+  .menu-title h1 span { color: var(--lime); }
+  .menu-title p { font-size: 10px; letter-spacing: 2px; color: var(--text-dim); margin: 0; }
+
+  .menu-btn {
+    width: 100%; max-width: 320px;
+    font-family: inherit; font-size: 12px; letter-spacing: 3px; font-weight: 700;
+    padding: 14px 16px; margin: 6px 0;
+    background: var(--bg-panel); color: var(--text-bright);
+    border: 1px solid #232a3a; border-radius: 6px; cursor: pointer;
+    display: flex; align-items: center; justify-content: space-between;
+    transition: border-color 0.15s ease, transform 0.1s ease;
+  }
+  .menu-btn:hover { border-color: var(--lime); transform: translateY(-1px); }
+  .menu-btn .arrow { color: var(--text-dim); }
+  .menu-btn.primary { background: var(--lime); color: #10210a; border-color: var(--lime); }
+  .menu-btn.primary:hover { filter: brightness(1.08); }
+  .menu-btn.small { max-width: 160px; font-size: 10px; padding: 10px 14px; }
+
+  .back-row { width: 100%; max-width: 320px; display: flex; justify-content: flex-start; margin-top: 14px; }
+
+  /* ---------- fun animated start screen ---------- */
+  .fun-screen {
+    position: relative;
+    overflow: hidden;
+    border-radius: 22px;
+    padding: 30px 20px 26px !important;
+    background: linear-gradient(-45deg, #ff5d8f, #ff9a3e, #ffd23f, #8be04f, #4fd8e0, #8b7bff);
+    background-size: 400% 400%;
+    animation: menuGradientShift 14s ease infinite;
+  }
+  @keyframes menuGradientShift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+  .fun-screen .menu-snake {
+    position: absolute;
+    pointer-events: none;
+    z-index: 0;
+    filter: drop-shadow(0 3px 4px rgba(0,0,0,0.2));
+    animation-timing-function: ease-in-out;
+    animation-iteration-count: infinite;
+  }
+  .fun-screen .menu-snake svg { display: block; animation: menuSnakeWiggle 1.1s ease-in-out infinite; }
+  .fun-screen .menu-snake.face-left svg { transform: scaleX(-1); }
+  @keyframes menuSnakeWiggle {
+    0%, 100% { transform: translateY(0) rotate(0deg); }
+    50% { transform: translateY(-5px) rotate(-3deg); }
+  }
+  .fun-screen .menu-snake.face-left svg { animation: menuSnakeWiggleFlip 1.1s ease-in-out infinite; }
+  @keyframes menuSnakeWiggleFlip {
+    0%, 100% { transform: scaleX(-1) translateY(0) rotate(0deg); }
+    50% { transform: scaleX(-1) translateY(-5px) rotate(3deg); }
+  }
+  @keyframes menuSnakeRight {
+    from { left: -140px; }
+    to   { left: calc(100% + 40px); }
+  }
+  @keyframes menuSnakeLeft {
+    from { left: calc(100% + 40px); }
+    to   { left: -140px; }
+  }
+  .fun-screen .menu-block {
+    position: absolute;
+    top: -60px;
+    pointer-events: none;
+    z-index: 0;
+    filter: drop-shadow(0 3px 4px rgba(0,0,0,0.22));
+    animation-name: menuBlockFall;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+  }
+  @keyframes menuBlockFall {
+    0%   { top: -60px; transform: rotate(0deg); }
+    100% { top: calc(100% + 60px); transform: rotate(360deg); }
+  }
+  .fun-screen .menu-title, .fun-screen .menu-btn { position: relative; z-index: 1; }
+  .fun-screen .settings-panel, .fun-screen .daily-card, .fun-screen .hs-list, .fun-screen .back-row {
+    position: relative; z-index: 1;
+  }
+  .fun-screen .menu-title { margin-bottom: 22px; }
+  .fun-screen .menu-title h1 {
+    font-family: 'Baloo 2', 'Fredoka', cursive, sans-serif;
+    font-size: 48px;
+    letter-spacing: 1px;
+    margin: 6px 0 10px 0;
+    color: #ffffff;
+    -webkit-text-stroke: 2px #2b2450;
+    text-shadow: 3px 3px 0 #2b2450, 0 10px 18px rgba(0,0,0,0.35);
+    animation: menuTitleBounce 2.4s ease-in-out infinite;
+    display: inline-block;
+  }
+  .fun-screen .menu-title h1 span { color: #fff452; -webkit-text-stroke: 2px #2b2450; }
+  @keyframes menuTitleBounce {
+    0%, 100% { transform: translateY(0) rotate(-1.5deg); }
+    50% { transform: translateY(-9px) rotate(1.5deg); }
+  }
+  .fun-screen .menu-title p {
+    font-family: 'Fredoka', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 3px;
+    color: #fff;
+    opacity: 0.95;
+    text-shadow: 1px 1px 3px rgba(0,0,0,0.3);
+  }
+  .fun-screen .menu-btn {
+    font-family: 'Fredoka', sans-serif;
+    font-weight: 600;
+    border: none;
+    border-radius: 16px;
+    font-size: 14px;
+    letter-spacing: 1.5px;
+    background: #ffffff;
+    color: #423b7a;
+    box-shadow: 0 5px 0 rgba(0,0,0,0.22), 0 10px 18px rgba(0,0,0,0.2);
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+  }
+  .fun-screen .menu-btn:hover {
+    transform: translateY(-3px) scale(1.03);
+    box-shadow: 0 8px 0 rgba(0,0,0,0.22), 0 14px 22px rgba(0,0,0,0.25);
+    border-color: transparent;
+  }
+  .fun-screen .menu-btn:active { transform: translateY(2px); box-shadow: 0 2px 0 rgba(0,0,0,0.22); }
+  .fun-screen .menu-btn.primary {
+    background: linear-gradient(180deg, #9dfb5c, #63c72e);
+    color: #16330a;
+    font-size: 17px;
+    font-weight: 700;
+    padding: 17px 18px;
+    animation: menuPulse 1.8s ease-in-out infinite;
+  }
+  @keyframes menuPulse {
+    0%, 100% { box-shadow: 0 5px 0 rgba(0,0,0,0.22), 0 10px 18px rgba(0,0,0,0.2), 0 0 0 0 rgba(157, 251, 92, 0.6); }
+    50% { box-shadow: 0 5px 0 rgba(0,0,0,0.22), 0 10px 18px rgba(0,0,0,0.2), 0 0 0 10px rgba(157, 251, 92, 0); }
+  }
+  .fun-screen .menu-btn .arrow { color: inherit; opacity: 0.55; }
+
+  /* ---------- settings ---------- */
+  .settings-panel { width: 100%; max-width: 340px; background: var(--bg-panel); border: 1px solid #232a3a; border-radius: 8px; padding: 18px; }
+  .settings-panel .label { font-size: 9px; letter-spacing: 3px; color: var(--text-dim); margin-bottom: 10px; }
+  .swatches { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
+  .swatch { width: 30px; height: 30px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; }
+  .swatch.selected { border-color: #fff; box-shadow: 0 0 0 2px var(--bg-panel), 0 0 0 4px currentColor; }
+  .color-input-row { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+  input[type="color"] {
+    width: 46px; height: 34px; border: none; border-radius: 6px; background: none; cursor: pointer; padding: 0;
+  }
+  .preview-strip { display: flex; align-items: center; gap: 6px; padding: 14px; background: var(--bg-deep); border-radius: 6px; margin-bottom: 16px; }
+  .preview-seg { border-radius: 40%; }
+
+  .env-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 6px; }
+  .env-btn { position: relative; border-radius: 6px; overflow: hidden; border: 2px solid #232a3a; cursor: pointer; background: var(--bg-deep); padding: 0; }
+  .env-btn:hover { border-color: #3a4152; }
+  .env-btn.selected { border-color: var(--lime); }
+  .env-btn canvas { display: block; width: 100%; height: 56px; }
+  .env-btn .env-label {
+    position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.6);
+    font-size: 8px; letter-spacing: 1px; text-align: center; padding: 4px 0; color: #fff;
+  }
+
+  /* ---------- daily ---------- */
+  .daily-card { width: 100%; max-width: 340px; background: var(--bg-panel); border: 1px solid #232a3a; border-radius: 8px; padding: 18px; }
+  .daily-card .tag { display: inline-block; font-size: 9px; letter-spacing: 2px; color: #10210a; background: var(--amber); padding: 3px 8px; border-radius: 3px; margin-bottom: 10px; }
+  .daily-card h3 { margin: 0 0 8px 0; font-size: 15px; letter-spacing: 1px; color: var(--text-bright); }
+  .daily-card p { font-size: 11px; color: var(--text-dim); line-height: 1.7; margin: 0 0 14px 0; }
+  .daily-card .best { font-size: 10px; letter-spacing: 2px; color: var(--cyan); margin-bottom: 16px; }
+
+  /* ---------- high scores ---------- */
+  .hs-list { width: 100%; max-width: 340px; background: var(--bg-panel); border: 1px solid #232a3a; border-radius: 8px; padding: 8px 18px; margin-bottom: 4px; max-height: 320px; overflow-y: auto; }
+  .hs-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid #1c2230; font-size: 11px; }
+  .hs-row:last-child { border-bottom: none; }
+  .hs-rank { width: 22px; color: var(--text-dim); font-weight: 700; }
+  .hs-score { flex: 1; color: var(--text-bright); font-weight: 700; letter-spacing: 1px; }
+  .hs-meta { color: var(--text-dim); font-size: 9px; letter-spacing: 1px; text-align: right; }
+  .hs-empty { text-align: center; color: var(--text-dim); font-size: 11px; padding: 24px 0; }
+  .hs-daily-tag { color: var(--amber); font-size: 9px; letter-spacing: 1px; margin-left: 4px; }
+
+  /* ---------- game screen ---------- */
+  #screen-game { gap: 28px; align-items: flex-start; }
+  .board-wrap { position: relative; }
+  .title-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding: 0 2px; }
+  .title-row h1 { font-size: 15px; letter-spacing: 5px; margin: 0; color: var(--text-bright); font-weight: 700; }
+  .title-row h1 span { color: var(--lime); }
+  .title-row .right-controls { display: flex; align-items: center; gap: 10px; }
+  .status-led { font-size: 9px; letter-spacing: 2px; color: var(--text-dim); display: flex; align-items: center; gap: 6px; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--lime); box-shadow: 0 0 8px var(--lime); }
+  .dot.off { background: #3a4152; box-shadow: none; }
+  .home-btn {
+    font-family: inherit; font-size: 9px; letter-spacing: 2px; color: var(--text-dim);
+    background: var(--bg-panel); border: 1px solid #232a3a; border-radius: 4px; padding: 5px 9px; cursor: pointer;
+  }
+  .home-btn:hover { color: var(--text-bright); border-color: var(--lime); }
+  canvas#board { background: var(--bg-panel); border-radius: 4px; display: block; border: 2px solid #232a3a; }
+  .overlay {
+    position: absolute; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center;
+    gap: 12px; background: rgba(8,10,15,0.88); border-radius: 4px; text-align: center; padding: 20px;
+  }
+  .overlay.show { display: flex; }
+  .overlay h2 { margin: 0; font-size: 20px; letter-spacing: 3px; color: var(--magenta); }
+  .overlay p { margin: 0; font-size: 11px; color: var(--text-dim); line-height: 1.7; max-width: 240px; }
+  .overlay .btn-row { display: flex; gap: 10px; margin-top: 4px; }
+  .overlay button {
+    font-family: inherit; font-size: 11px; letter-spacing: 2px; padding: 10px 18px;
+    background: var(--lime); color: #10210a; border: none; border-radius: 3px; cursor: pointer; font-weight: 700;
+  }
+  .overlay button:hover { filter: brightness(1.1); }
+  .overlay button.secondary { background: transparent; color: var(--text-dim); border: 1px solid #232a3a; }
+  .overlay button.secondary:hover { color: var(--text-bright); border-color: var(--text-bright); }
+  .side { width: 172px; display: flex; flex-direction: column; gap: 14px; }
+  .panel { background: var(--bg-panel); border: 1px solid #232a3a; border-radius: 6px; padding: 12px 14px; }
+  .panel .label { font-size: 9px; letter-spacing: 3px; color: var(--text-dim); margin-bottom: 6px; }
+  .panel .value { font-size: 22px; color: var(--cyan); font-weight: 700; letter-spacing: 1px; }
+  .stat-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .stat-row .panel { flex: 1; }
+  .eat-status {
+    font-size: 10px; letter-spacing: 1.5px; padding: 8px 10px; border-radius: 4px; text-align: center;
+    background: #1c2230; color: var(--text-dim); border: 1px solid #232a3a;
+  }
+  .eat-status.unlocked { color: #10210a; background: var(--lime); border-color: var(--lime); font-weight: 700; }
+  .eat-fill { height: 5px; border-radius: 3px; background: #1c2230; overflow: hidden; margin-top: 6px; }
+  .eat-fill > div { height: 100%; background: linear-gradient(90deg, var(--violet), var(--lime)); width: 0%; transition: width 0.2s ease; }
+  .controls-list { font-size: 10px; line-height: 2.1; color: var(--text-dim); }
+  .controls-list b { color: var(--text-bright); background: #1c2230; padding: 1px 6px; border-radius: 3px; margin-right: 6px; font-size: 9px; }
+
+  @media (max-width: 640px) {
+    #screen-game { flex-direction: column; align-items: center; }
+    .side { flex-direction: row; flex-wrap: wrap; width: 100%; max-width: 340px; }
+    .panel { flex: 1 1 45%; }
+  }
+</style>
+</head>
+<body>
+
+<div class="cabinet">
+
+  <!-- MAIN MENU -->
+  <div class="screen active fun-screen" id="screen-menu">
+    <div class="menu-title">
+      <h1>COIL<span>STACK</span></h1>
+      <p>SNAKE VS. FALLING BLOCKS</p>
+    </div>
+    <button class="menu-btn primary" id="btnPlay">PLAY <span class="arrow" id="playArrow">&rarr;</span></button>
+    <button class="menu-btn" id="btnNewGame">NEW GAME <span class="arrow">&rarr;</span></button>
+    <button class="menu-btn" id="btnSettings">SETTINGS <span class="arrow">&rarr;</span></button>
+    <button class="menu-btn" id="btnDaily">DAILY CHALLENGE <span class="arrow">&rarr;</span></button>
+    <button class="menu-btn" id="btnHighScores">HIGH SCORES <span class="arrow">&rarr;</span></button>
+  </div>
+
+  <!-- SETTINGS -->
+  <div class="screen fun-screen" id="screen-settings">
+    <div class="menu-title"><h1 style="font-size:18px;">SETTINGS</h1></div>
+    <div class="settings-panel">
+      <div class="label">SNAKE COLOR</div>
+      <div class="swatches" id="swatches"></div>
+      <div class="color-input-row">
+        <input type="color" id="colorPicker" value="#4fd8e0">
+        <span style="font-size:10px; color:var(--text-dim); letter-spacing:1px;">or pick any shade</span>
+      </div>
+      <div class="label">PREVIEW</div>
+      <div class="preview-strip" id="previewStrip"></div>
+      <div class="label" style="margin-top:4px;">ENVIRONMENT</div>
+      <div class="env-grid" id="envGrid"></div>
+    </div>
+    <div class="back-row"><button class="menu-btn small" id="btnSettingsBack">&larr; BACK</button></div>
+  </div>
+
+  <!-- DAILY CHALLENGE -->
+  <div class="screen fun-screen" id="screen-daily">
+    <div class="menu-title"><h1 style="font-size:18px;">DAILY CHALLENGE</h1></div>
+    <div class="daily-card">
+      <span class="tag" id="dailyDate">—</span>
+      <h3 id="dailyName">Loading…</h3>
+      <p id="dailyDesc"></p>
+      <div class="best" id="dailyBest">Best today: —</div>
+      <button class="menu-btn primary" id="btnDailyStart" style="max-width:none;">START CHALLENGE <span class="arrow">&rarr;</span></button>
+    </div>
+    <div class="back-row"><button class="menu-btn small" id="btnDailyBack">&larr; BACK</button></div>
+  </div>
+
+  <!-- HIGH SCORES -->
+  <div class="screen fun-screen" id="screen-highscores">
+    <div class="menu-title"><h1 style="font-size:18px;">HIGH SCORES</h1></div>
+    <div class="hs-list" id="hsList"></div>
+    <div class="back-row" style="justify-content:space-between; max-width:340px;">
+      <button class="menu-btn small" id="btnHsBack">&larr; BACK</button>
+      <button class="menu-btn small" id="btnHsClear" style="color:var(--magenta);">CLEAR</button>
+    </div>
+  </div>
+
+  <!-- GAME -->
+  <div class="screen" id="screen-game">
+    <div class="board-wrap">
+      <div class="title-row">
+        <h1>COIL<span>STACK</span></h1>
+        <div class="right-controls">
+          <div class="status-led"><span class="dot" id="statusDot"></span><span id="statusText">RUNNING</span></div>
+          <button class="home-btn" id="btnHome">MENU</button>
+        </div>
+      </div>
+      <canvas id="board" width="480" height="480"></canvas>
+      <div class="overlay" id="overlay">
+        <h2 id="overlayTitle">PAUSED</h2>
+        <p id="overlayText">Hold position. Resume when ready.</p>
+        <div class="btn-row">
+          <button id="overlayBtn">RESUME</button>
+          <button class="secondary" id="overlayBtn2">MENU</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="side">
+      <div class="panel">
+        <div class="label">SCORE</div>
+        <div class="value" id="score">0</div>
+      </div>
+      <div class="stat-row">
+        <div class="panel">
+          <div class="label">LEVEL</div>
+          <div class="value" id="level" style="color:var(--amber);">1</div>
+        </div>
+        <div class="panel">
+          <div class="label">LENGTH</div>
+          <div class="value" id="length" style="color:var(--lime);">3</div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="label">EAT-BLOCK STATUS</div>
+        <div class="eat-status" id="eatStatus">TOO SMALL — DODGE ONLY</div>
+        <div class="eat-fill"><div id="eatFillBar"></div></div>
+      </div>
+      <div class="panel controls-list">
+        <div><b>&larr;&uarr;&darr;&rarr;</b>steer</div>
+        <div><b>P</b>pause</div>
+        <div style="margin-top:6px; color:var(--text-dim);">Balls grow you. Grow enough and blocks become food instead of hazards.</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function() {
+  /* ========================= persistence ========================= */
+  const LS_HIGHSCORES = 'coilstack_highscores';
+  const LS_COLOR = 'coilstack_snake_color';
+  const LS_SESSION = 'coilstack_session';
+  const LS_DAILY_PREFIX = 'coilstack_daily_best_';
+
+  function loadHighScores() {
+    try { return JSON.parse(localStorage.getItem(LS_HIGHSCORES)) || []; }
+    catch (e) { return []; }
+  }
+  function saveHighScore(entry) {
+    const list = loadHighScores();
+    list.push(entry);
+    list.sort((a, b) => b.score - a.score);
+    localStorage.setItem(LS_HIGHSCORES, JSON.stringify(list.slice(0, 20)));
+  }
+  function loadColor() { return localStorage.getItem(LS_COLOR) || '#4fd8e0'; }
+  function saveColor(c) { localStorage.setItem(LS_COLOR, c); }
+  const LS_ENV = 'coilstack_environment';
+  function loadEnv() { return localStorage.getItem(LS_ENV) || 'arcade'; }
+  function saveEnv(e) { localStorage.setItem(LS_ENV, e); }
+
+  function saveSession(state) { localStorage.setItem(LS_SESSION, JSON.stringify(state)); }
+  function loadSession() {
+    try { return JSON.parse(localStorage.getItem(LS_SESSION)); }
+    catch (e) { return null; }
+  }
+  function clearSession() { localStorage.removeItem(LS_SESSION); }
+
+  function dailyBestKey(dateStr) { return LS_DAILY_PREFIX + dateStr; }
+  function getDailyBest(dateStr) { return parseInt(localStorage.getItem(dailyBestKey(dateStr)) || '0', 10); }
+  function setDailyBest(dateStr, score) {
+    if (score > getDailyBest(dateStr)) localStorage.setItem(dailyBestKey(dateStr), String(score));
+  }
+
+  /* ========================= color helpers ========================= */
+  function hexToHsl(hex) {
+    let r = parseInt(hex.slice(1, 3), 16) / 255;
+    let g = parseInt(hex.slice(3, 5), 16) / 255;
+    let b = parseInt(hex.slice(5, 7), 16) / 255;
+    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+    let h, s, l = (max + min) / 2;
+    if (max === min) { h = s = 0; }
+    else {
+      const d = max - min;
+      s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+      switch (max) {
+        case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+        case g: h = (b - r) / d + 2; break;
+        case b: h = (r - g) / d + 4; break;
+      }
+      h /= 6;
+    }
+    return [h * 360, s * 100, l * 100];
+  }
+  function hslToHex(h, s, l) {
+    s /= 100; l /= 100;
+    const k = n => (n + h / 30) % 12;
+    const a = s * Math.min(l, 1 - l);
+    const f = n => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+    const toHex = x => Math.round(255 * x).toString(16).padStart(2, '0');
+    return `#${toHex(f(0))}${toHex(f(8))}${toHex(f(4))}`;
+  }
+  function shade(hex, dl, ds) {
+    const [h, s, l] = hexToHsl(hex);
+    return hslToHex(h, Math.max(0, Math.min(100, s + (ds || 0))), Math.max(0, Math.min(100, l + dl)));
+  }
+
+  /* ========================= environments ========================= */
+  function buildArcadeBg(o) { o.fillStyle = '#12161f'; o.fillRect(0, 0, 480, 480); }
+
+  function buildBeachBg(o) {
+    const grad = o.createLinearGradient(0, 0, 0, 480);
+    grad.addColorStop(0, '#8ed8f0'); grad.addColorStop(0.55, '#cdeef4');
+    grad.addColorStop(0.56, '#f2d9a0'); grad.addColorStop(1, '#dfb96e');
+    o.fillStyle = grad; o.fillRect(0, 0, 480, 480);
+    o.beginPath(); o.fillStyle = 'rgba(255,244,200,0.9)'; o.arc(400, 68, 34, 0, Math.PI * 2); o.fill();
+    o.strokeStyle = 'rgba(255,255,255,0.55)'; o.lineWidth = 2;
+    for (let i = 0; i < 3; i++) {
+      o.beginPath();
+      for (let x = 0; x <= 480; x += 20) o.lineTo(x, 250 + i * 16 + Math.sin(x / 40 + i) * 4);
+      o.stroke();
+    }
+  }
+
+  function buildSpaceBg(o) {
+    const grad = o.createRadialGradient(240, 220, 20, 240, 240, 340);
+    grad.addColorStop(0, '#1b2340'); grad.addColorStop(1, '#05060a');
+    o.fillStyle = grad; o.fillRect(0, 0, 480, 480);
+    o.fillStyle = '#ffffff';
+    for (let i = 0; i < 90; i++) {
+      const x = Math.random() * 480, y = Math.random() * 480, r = Math.random() * 1.3 + 0.3;
+      o.globalAlpha = Math.random() * 0.7 + 0.3;
+      o.beginPath(); o.arc(x, y, r, 0, Math.PI * 2); o.fill();
+    }
+    o.globalAlpha = 1;
+    o.beginPath(); o.fillStyle = '#8b7bff'; o.arc(78, 400, 32, 0, Math.PI * 2); o.fill();
+    o.strokeStyle = 'rgba(255,255,255,0.3)'; o.lineWidth = 2;
+    o.beginPath(); o.ellipse(78, 400, 48, 13, 0.4, 0, Math.PI * 2); o.stroke();
+  }
+
+  function buildHouseBg(o) {
+    o.fillStyle = '#3d2c21'; o.fillRect(0, 0, 480, 480);
+    o.strokeStyle = 'rgba(0,0,0,0.25)'; o.lineWidth = 2;
+    for (let x = 0; x <= 480; x += 40) { o.beginPath(); o.moveTo(x, 0); o.lineTo(x, 480); o.stroke(); }
+    o.fillStyle = 'rgba(140,80,58,0.55)'; o.fillRect(140, 140, 200, 200);
+    o.strokeStyle = 'rgba(230,200,160,0.6)'; o.lineWidth = 4;
+    o.strokeRect(150, 150, 180, 180);
+  }
+
+  function buildUnderwaterBg(o) {
+    const grad = o.createLinearGradient(0, 0, 0, 480);
+    grad.addColorStop(0, '#0f4a6e'); grad.addColorStop(1, '#062338');
+    o.fillStyle = grad; o.fillRect(0, 0, 480, 480);
+    o.fillStyle = 'rgba(255,255,255,0.25)';
+    for (let i = 0; i < 36; i++) {
+      const x = Math.random() * 480, y = Math.random() * 480, r = Math.random() * 3 + 1;
+      o.beginPath(); o.arc(x, y, r, 0, Math.PI * 2); o.fill();
+    }
+    o.strokeStyle = 'rgba(79,216,150,0.5)'; o.lineWidth = 4;
+    for (let i = 0; i < 5; i++) {
+      const bx = 40 + i * 90;
+      o.beginPath(); o.moveTo(bx, 480);
+      o.quadraticCurveTo(bx + 20, 420, bx, 380);
+      o.quadraticCurveTo(bx - 20, 340, bx, 300);
+      o.stroke();
+    }
+  }
+
+  function buildSafariBg(o) {
+    const grad = o.createLinearGradient(0, 0, 0, 480);
+    grad.addColorStop(0, '#ffd98a'); grad.addColorStop(0.5, '#f5c56b');
+    grad.addColorStop(0.51, '#c2a23e'); grad.addColorStop(1, '#8a7a2e');
+    o.fillStyle = grad; o.fillRect(0, 0, 480, 480);
+    o.beginPath(); o.fillStyle = 'rgba(255,255,255,0.65)'; o.arc(400, 68, 28, 0, Math.PI * 2); o.fill();
+    o.strokeStyle = 'rgba(90,110,40,0.55)'; o.lineWidth = 2;
+    for (let i = 0; i < 40; i++) {
+      const x = Math.random() * 480, y = 260 + Math.random() * 220;
+      o.beginPath(); o.moveTo(x, y); o.lineTo(x - 4, y - 14); o.moveTo(x, y); o.lineTo(x + 4, y - 12); o.stroke();
+    }
+  }
+
+  const ENVIRONMENTS = {
+    arcade: { label: 'ARCADE', gridLine: '#1c2230', build: buildArcadeBg },
+    beach: { label: 'BEACH', gridLine: 'rgba(160,120,40,0.28)', build: buildBeachBg },
+    space: { label: 'SPACE', gridLine: 'rgba(139,123,255,0.25)', build: buildSpaceBg },
+    house: { label: 'INDOORS', gridLine: 'rgba(230,200,160,0.22)', build: buildHouseBg },
+    underwater: { label: 'UNDERWATER', gridLine: 'rgba(79,216,224,0.28)', build: buildUnderwaterBg },
+    safari: { label: 'SAFARI', gridLine: 'rgba(80,60,20,0.3)', build: buildSafariBg },
+  };
+
+  let currentEnv = loadEnv();
+  const envBgCanvas = document.createElement('canvas');
+  envBgCanvas.width = 480; envBgCanvas.height = 480;
+  function applyEnvironment(key) {
+    currentEnv = key;
+    saveEnv(key);
+    const o = envBgCanvas.getContext('2d');
+    o.clearRect(0, 0, 480, 480);
+    ENVIRONMENTS[key].build(o);
+  }
+  applyEnvironment(currentEnv);
+
+  /* ========================= screens ========================= */
+  const screens = {
+    menu: document.getElementById('screen-menu'),
+    settings: document.getElementById('screen-settings'),
+    daily: document.getElementById('screen-daily'),
+    highscores: document.getElementById('screen-highscores'),
+    game: document.getElementById('screen-game'),
+  };
+  function showScreen(name) {
+    Object.values(screens).forEach(s => s.classList.remove('active'));
+    screens[name].classList.add('active');
+    if (name === 'menu') refreshMenu();
+    if (name === 'settings') refreshSettings();
+    if (name === 'daily') refreshDaily();
+    if (name === 'highscores') refreshHighScores();
+  }
+
+  function refreshMenu() {
+    const hasSession = !!loadSession();
+    document.getElementById('playArrow').parentElement.firstChild.textContent = hasSession ? 'RESUME ' : 'PLAY ';
+  }
+
+  /* ---- settings screen ---- */
+  const PRESET_COLORS = ['#4fd8e0', '#8be04f', '#ff5d8f', '#ffb32e', '#8b7bff', '#ff8a3d', '#5b8dee', '#e8ecf4'];
+  let snakeColor = loadColor();
+
+  function buildSwatches() {
+    const wrap = document.getElementById('swatches');
+    wrap.innerHTML = '';
+    PRESET_COLORS.forEach(c => {
+      const el = document.createElement('div');
+      el.className = 'swatch' + (c.toLowerCase() === snakeColor.toLowerCase() ? ' selected' : '');
+      el.style.background = c;
+      el.style.color = c;
+      el.addEventListener('click', () => { snakeColor = c; document.getElementById('colorPicker').value = c; refreshSettings(); });
+      wrap.appendChild(el);
+    });
+  }
+  function refreshSettings() {
+    buildSwatches();
+    document.getElementById('colorPicker').value = snakeColor;
+    const strip = document.getElementById('previewStrip');
+    strip.innerHTML = '';
+    for (let i = 0; i < 6; i++) {
+      const seg = document.createElement('div');
+      const size = 26 - i * 2;
+      seg.className = 'preview-seg';
+      seg.style.width = size + 'px';
+      seg.style.height = size + 'px';
+      seg.style.background = i === 0 ? shade(snakeColor, 15, 10) : (i % 2 === 0 ? snakeColor : shade(snakeColor, -10, 0));
+      strip.appendChild(seg);
+    }
+    saveColor(snakeColor);
+    buildEnvGrid();
+  }
+
+  function buildEnvGrid() {
+    const grid = document.getElementById('envGrid');
+    grid.innerHTML = '';
+    Object.keys(ENVIRONMENTS).forEach(key => {
+      const env = ENVIRONMENTS[key];
+      const btn = document.createElement('div');
+      btn.className = 'env-btn' + (key === currentEnv ? ' selected' : '');
+      const thumb = document.createElement('canvas');
+      thumb.width = 200; thumb.height = 56;
+      const tctx = thumb.getContext('2d');
+      tctx.save();
+      tctx.scale(200 / 480, 56 / 480);
+      env.build(tctx);
+      tctx.restore();
+      const label = document.createElement('div');
+      label.className = 'env-label';
+      label.textContent = env.label;
+      btn.appendChild(thumb);
+      btn.appendChild(label);
+      btn.addEventListener('click', () => { applyEnvironment(key); buildEnvGrid(); });
+      grid.appendChild(btn);
+    });
+  }
+  document.getElementById('colorPicker').addEventListener('input', (e) => { snakeColor = e.target.value; refreshSettings(); });
+  document.getElementById('btnSettingsBack').addEventListener('click', () => showScreen('menu'));
+
+  /* ---- daily challenge screen ---- */
+  const DAILY_VARIANTS = [
+    { name: 'TURBO BLOCKS', desc: 'Blocks fall at level-3 speed right from the start. Balls spawn as usual — stay sharp early.', dropStart: 3, eatThreshold: 10, ballInterval: 2600 },
+    { name: 'EARLY GIANT', desc: 'You start already long enough to eat blocks. The challenge is surviving the speed ramp that follows.', dropStart: 1, eatThreshold: 3, ballInterval: 2600 },
+    { name: 'LEAN SEASON', desc: 'Balls are scarce and far apart. Growing large enough to eat blocks will take patience and clean dodging.', dropStart: 1, eatThreshold: 10, ballInterval: 4600 },
+  ];
+  function hashStr(s) { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0; return h; }
+  function todayStr() { return new Date().toISOString().slice(0, 10); }
+  function todaysVariant() {
+    const d = todayStr();
+    return { date: d, variant: DAILY_VARIANTS[hashStr(d) % DAILY_VARIANTS.length] };
+  }
+  function refreshDaily() {
+    const { date, variant } = todaysVariant();
+    document.getElementById('dailyDate').textContent = date;
+    document.getElementById('dailyName').textContent = variant.name;
+    document.getElementById('dailyDesc').textContent = variant.desc;
+    const best = getDailyBest(date);
+    document.getElementById('dailyBest').textContent = 'Best today: ' + (best > 0 ? best : '—');
+  }
+  document.getElementById('btnDailyBack').addEventListener('click', () => showScreen('menu'));
+  document.getElementById('btnDailyStart').addEventListener('click', () => {
+    const { date, variant } = todaysVariant();
+    clearSession();
+    startGame({ daily: true, dailyDate: date, variant });
+  });
+
+  /* ---- high scores screen ---- */
+  function refreshHighScores() {
+    const list = loadHighScores();
+    const el = document.getElementById('hsList');
+    if (list.length === 0) {
+      el.innerHTML = '<div class="hs-empty">No runs recorded yet. Play a game to set your first score.</div>';
+      return;
+    }
+    el.innerHTML = list.map((entry, i) => `
+      <div class="hs-row">
+        <div class="hs-rank">${i + 1}</div>
+        <div class="hs-score">${entry.score}${entry.daily ? '<span class="hs-daily-tag">DAILY</span>' : ''}</div>
+        <div class="hs-meta">LV ${entry.level} · LEN ${entry.length}<br>${entry.date}</div>
+      </div>
+    `).join('');
+  }
+  document.getElementById('btnHsBack').addEventListener('click', () => showScreen('menu'));
+  document.getElementById('btnHsClear').addEventListener('click', () => {
+    if (confirm('Clear all saved high scores? This cannot be undone.')) {
+      localStorage.removeItem(LS_HIGHSCORES);
+      refreshHighScores();
+    }
+  });
+
+  /* ---- menu buttons ---- */
+  document.getElementById('btnPlay').addEventListener('click', () => {
+    const session = loadSession();
+    if (session) resumeGame(session);
+    else startGame({});
+  });
+  document.getElementById('btnNewGame').addEventListener('click', () => { clearSession(); startGame({}); });
+  document.getElementById('btnSettings').addEventListener('click', () => showScreen('settings'));
+  document.getElementById('btnDaily').addEventListener('click', () => showScreen('daily'));
+  document.getElementById('btnHighScores').addEventListener('click', () => showScreen('highscores'));
+
+  /* ========================= GAME ========================= */
+  const COLS = 20, ROWS = 20, CELL = 24;
+  const canvas = document.getElementById('board');
+  const ctx = canvas.getContext('2d');
+
+  const scoreEl = document.getElementById('score');
+  const levelEl = document.getElementById('level');
+  const lengthEl = document.getElementById('length');
+  const eatStatus = document.getElementById('eatStatus');
+  const eatFillBar = document.getElementById('eatFillBar');
+  const overlay = document.getElementById('overlay');
+  const overlayTitle = document.getElementById('overlayTitle');
+  const overlayText = document.getElementById('overlayText');
+  const overlayBtn = document.getElementById('overlayBtn');
+  const overlayBtn2 = document.getElementById('overlayBtn2');
+  const statusDot = document.getElementById('statusDot');
+  const statusText = document.getElementById('statusText');
+
+  const SNAKE_INTERVAL = 130;
+  const MAX_BALLS = 3;
+
+  const COLORS = { I: '#4fd8e0', O: '#ffb32e', T: '#8b7bff', S: '#8be04f', Z: '#ff5d8f', J: '#5b8dee', L: '#ff8a3d' };
+  const SHAPES = {
+    I: [[0,0],[1,0],[2,0],[3,0]], O: [[0,0],[1,0],[0,1],[1,1]], T: [[0,0],[1,0],[2,0],[1,1]],
+    S: [[1,0],[2,0],[0,1],[1,1]], Z: [[0,0],[1,0],[1,1],[2,1]], J: [[0,0],[0,1],[1,1],[2,1]], L: [[2,0],[0,1],[1,1],[2,1]]
+  };
+
+  let blockGrid, fallingPiece, balls, snake, dir, queuedDir;
+  let score, level, ballsEaten, EAT_THRESHOLD, BALL_SPAWN_INTERVAL, baseDropInterval;
+  let dropInterval, dropTimer, snakeTimer, ballTimer, lastTime;
+  let running, paused, gameOver, isDaily, dailyMeta;
+
+  function emptyGrid() { return Array.from({ length: ROWS }, () => Array(COLS).fill(null)); }
+
+  function spawnPiece() {
+    const keys = Object.keys(SHAPES);
+    const key = keys[Math.floor(Math.random() * keys.length)];
+    const shape = SHAPES[key];
+    const maxX = Math.max(...shape.map(c => c[0]));
+    const startX = Math.floor(Math.random() * (COLS - maxX));
+    const cells = shape.map(([x, y]) => ({ x: x + startX, y: y - 2 }));
+    return { cells, color: COLORS[key] };
+  }
+
+  function startGame(opts) {
+    isDaily = !!opts.daily;
+    dailyMeta = opts.daily ? { date: opts.dailyDate } : null;
+    const variant = opts.variant || { dropStart: 1, eatThreshold: 10, ballInterval: 2600 };
+    EAT_THRESHOLD = variant.eatThreshold;
+    BALL_SPAWN_INTERVAL = variant.ballInterval;
+
+    blockGrid = emptyGrid();
+    balls = [];
+    const startLen = variant.eatThreshold <= 3 ? 4 : 3;
+    const midY = Math.floor(ROWS / 2);
+    snake = [];
+    for (let i = 0; i < startLen; i++) snake.push({ x: 6 - i, y: midY });
+    dir = { x: 1, y: 0 };
+    queuedDir = dir;
+    score = 0; level = variant.dropStart; ballsEaten = 0;
+    baseDropInterval = Math.max(140, 750 - (level - 1) * 55);
+    dropInterval = baseDropInterval;
+    dropTimer = 0; snakeTimer = 0; ballTimer = 0; lastTime = 0;
+    running = true; paused = false; gameOver = false;
+    fallingPiece = spawnPiece();
+    statusDot.classList.remove('off');
+    statusText.textContent = 'RUNNING';
+    hideOverlay();
+    updateHUD();
+    showScreen('game');
+  }
+
+  function resumeGame(state) {
+    isDaily = state.isDaily; dailyMeta = state.dailyMeta;
+    blockGrid = state.blockGrid; balls = state.balls; snake = state.snake;
+    dir = state.dir; queuedDir = state.dir; fallingPiece = state.fallingPiece;
+    score = state.score; level = state.level; ballsEaten = state.ballsEaten;
+    EAT_THRESHOLD = state.EAT_THRESHOLD; BALL_SPAWN_INTERVAL = state.BALL_SPAWN_INTERVAL;
+    dropInterval = state.dropInterval;
+    dropTimer = 0; snakeTimer = 0; ballTimer = 0; lastTime = 0;
+    running = true; paused = false; gameOver = false;
+    statusDot.classList.remove('off');
+    statusText.textContent = 'RUNNING';
+    hideOverlay();
+    updateHUD();
+    showScreen('game');
+  }
+
+  function pauseToMenu() {
+    running = false;
+    saveSession({
+      isDaily, dailyMeta, blockGrid, balls, snake, dir, fallingPiece,
+      score, level, ballsEaten, EAT_THRESHOLD, BALL_SPAWN_INTERVAL, dropInterval
+    });
+    showScreen('menu');
+  }
+
+  document.getElementById('btnHome').addEventListener('click', () => {
+    if (gameOver) { clearSession(); showScreen('menu'); return; }
+    pauseToMenu();
+  });
+  overlayBtn2.addEventListener('click', () => {
+    if (gameOver) { clearSession(); showScreen('menu'); }
+    else pauseToMenu();
+  });
+
+  function updateHUD() {
+    scoreEl.textContent = score;
+    levelEl.textContent = level;
+    lengthEl.textContent = snake.length;
+    const canEat = snake.length >= EAT_THRESHOLD;
+    eatStatus.textContent = canEat ? 'UNLOCKED — BLOCKS ARE FOOD' : 'TOO SMALL — DODGE ONLY';
+    eatStatus.classList.toggle('unlocked', canEat);
+    eatFillBar.style.width = Math.min(100, (snake.length / EAT_THRESHOLD) * 100) + '%';
+  }
+
+  function setLevel() {
+    const newLevel = 1 + Math.floor(score / 250);
+    if (newLevel !== level) {
+      level = newLevel;
+      dropInterval = Math.max(140, 750 - (level - 1) * 55);
+    }
+  }
+
+  function cellFree(x, y) {
+    if (x < 0 || x >= COLS || y < 0 || y >= ROWS) return false;
+    if (blockGrid[y][x]) return false;
+    if (snake.some(s => s.x === x && s.y === y)) return false;
+    if (balls.some(b => b.x === x && b.y === y)) return false;
+    if (fallingPiece.cells.some(c => c.x === x && c.y === y)) return false;
+    return true;
+  }
+
+  function spawnBall() {
+    if (balls.length >= MAX_BALLS) return;
+    let tries = 0;
+    while (tries < 50) {
+      const x = Math.floor(Math.random() * COLS);
+      const y = Math.floor(Math.random() * ROWS);
+      if (cellFree(x, y)) { balls.push({ x, y }); return; }
+      tries++;
+    }
+  }
+
+  function checkLineClear() {
+    let cleared = 0;
+    for (let y = ROWS - 1; y >= 0; y--) {
+      if (blockGrid[y].every(cell => cell)) {
+        blockGrid.splice(y, 1);
+        blockGrid.unshift(Array(COLS).fill(null));
+        cleared++;
+        y++;
+      }
+    }
+    if (cleared > 0) {
+      score += cleared * 200 * level;
+      setLevel();
+      updateHUD();
+    }
+  }
+
+  function lockFallingPiece() {
+    let toppedOut = false;
+    for (const c of fallingPiece.cells) {
+      if (c.y < 0) { toppedOut = true; continue; }
+      blockGrid[c.y][c.x] = fallingPiece.color;
+    }
+    checkLineClear();
+    fallingPiece = spawnPiece();
+    if (fallingPiece.cells.some(c => c.y >= 0 && blockGrid[c.y] && blockGrid[c.y][c.x])) toppedOut = true;
+    if (toppedOut) endGame('TOPPED OUT', `The stack reached the top. Final score ${score}.`);
+  }
+
+  function stepFallingPiece() {
+    if (gameOver) return;
+    const proposed = fallingPiece.cells.map(c => ({ x: c.x, y: c.y + 1 }));
+    const survivors = [];
+    for (const c of proposed) {
+      const hitIdx = snake.findIndex(s => s.x === c.x && s.y === c.y);
+      if (hitIdx !== -1) {
+        if (snake.length >= EAT_THRESHOLD) { score += 15; continue; }
+        else { endGame('CRUSHED', `A falling block landed on the snake. Final score ${score}.`); return; }
+      }
+      survivors.push(c);
+    }
+    if (survivors.length === 0) { updateHUD(); fallingPiece = spawnPiece(); return; }
+    const shouldLock = survivors.some(c => (c.y >= ROWS) || (c.y >= 0 && blockGrid[c.y][c.x]));
+    if (shouldLock) {
+      fallingPiece.cells = survivors.map(c => ({ x: c.x, y: c.y - 1 }));
+      lockFallingPiece();
+    } else {
+      fallingPiece.cells = survivors;
+    }
+    updateHUD();
+  }
+
+  function stepSnake() {
+    if (gameOver) return;
+    if (!(queuedDir.x === -dir.x && queuedDir.y === -dir.y && snake.length > 1)) dir = queuedDir;
+    const head = snake[0];
+    const newHead = { x: head.x + dir.x, y: head.y + dir.y };
+
+    if (newHead.x < 0 || newHead.x >= COLS || newHead.y < 0 || newHead.y >= ROWS) {
+      endGame('WALL HIT', `The snake ran off the board. Final score ${score}.`); return;
+    }
+
+    let growing = false;
+    const ballIdx = balls.findIndex(b => b.x === newHead.x && b.y === newHead.y);
+    if (ballIdx !== -1) { balls.splice(ballIdx, 1); growing = true; ballsEaten++; score += 25; }
+
+    const bodyToCheck = growing ? snake : snake.slice(0, -1);
+    if (bodyToCheck.some(s => s.x === newHead.x && s.y === newHead.y)) {
+      endGame('SELF COLLISION', `The snake ran into itself. Final score ${score}.`); return;
+    }
+
+    if (blockGrid[newHead.y][newHead.x]) {
+      if (snake.length >= EAT_THRESHOLD) { blockGrid[newHead.y][newHead.x] = null; score += 15; }
+      else { endGame('BLOCK COLLISION', `Too small to eat that block. Final score ${score}.`); return; }
+    }
+
+    const pieceIdx = fallingPiece.cells.findIndex(c => c.x === newHead.x && c.y === newHead.y);
+    if (pieceIdx !== -1) {
+      if (snake.length >= EAT_THRESHOLD) { fallingPiece.cells.splice(pieceIdx, 1); score += 15; }
+      else { endGame('BLOCK COLLISION', `Too small to eat that block. Final score ${score}.`); return; }
+    }
+
+    snake.unshift(newHead);
+    if (!growing) snake.pop();
+    setLevel();
+    updateHUD();
+  }
+
+  /* ---- rendering ---- */
+  function drawCell(x, y, color) {
+    const px = x * CELL, py = y * CELL;
+    ctx.fillStyle = color;
+    ctx.fillRect(px + 1, py + 1, CELL - 2, CELL - 2);
+    ctx.fillStyle = 'rgba(255,255,255,0.15)';
+    ctx.fillRect(px + 1, py + 1, CELL - 2, 4);
+  }
+
+  function draw() {
+    ctx.drawImage(envBgCanvas, 0, 0);
+    ctx.strokeStyle = ENVIRONMENTS[currentEnv].gridLine;
+    ctx.lineWidth = 1;
+    for (let x = 0; x <= COLS; x++) { ctx.beginPath(); ctx.moveTo(x * CELL, 0); ctx.lineTo(x * CELL, ROWS * CELL); ctx.stroke(); }
+    for (let y = 0; y <= ROWS; y++) { ctx.beginPath(); ctx.moveTo(0, y * CELL); ctx.lineTo(COLS * CELL, y * CELL); ctx.stroke(); }
+
+    for (let y = 0; y < ROWS; y++)
+      for (let x = 0; x < COLS; x++)
+        if (blockGrid[y][x]) drawCell(x, y, blockGrid[y][x]);
+
+    for (const c of fallingPiece.cells) if (c.y >= 0) drawCell(c.x, c.y, fallingPiece.color);
+
+    for (const b of balls) {
+      const px = b.x * CELL + CELL / 2, py = b.y * CELL + CELL / 2;
+      ctx.beginPath();
+      ctx.fillStyle = '#ffe066';
+      ctx.shadowColor = '#ffe066';
+      ctx.shadowBlur = 12;
+      ctx.arc(px, py, CELL * 0.28, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    }
+
+    drawSnake();
+  }
+
+  function roundRectPath(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+  function segCenter(s) { return { cx: s.x * CELL + CELL / 2, cy: s.y * CELL + CELL / 2 }; }
+
+  function drawSnake() {
+    const canEat = snake.length >= EAT_THRESHOLD;
+    const base = snakeColor;
+    const bodyA = base;
+    const bodyB = shade(base, -10, 0);
+    const headColor = canEat ? shade(base, 22, 15) : shade(base, 8, 0);
+
+    for (let i = snake.length - 1; i >= 1; i--) {
+      const s = snake[i];
+      const t = i / snake.length;
+      const size = CELL * (0.92 - t * 0.35);
+      const px = s.x * CELL + CELL / 2 - size / 2;
+      const py = s.y * CELL + CELL / 2 - size / 2;
+      const c = i % 2 === 0 ? bodyA : bodyB;
+      roundRectPath(px, py, size, size, size * 0.4);
+      ctx.fillStyle = c;
+      ctx.fill();
+      const prev = snake[i - 1];
+      if (Math.abs(prev.x - s.x) + Math.abs(prev.y - s.y) === 1) {
+        const a = segCenter(s), b = segCenter(prev);
+        ctx.beginPath();
+        ctx.strokeStyle = c;
+        ctx.lineWidth = size * 0.82;
+        ctx.lineCap = 'round';
+        ctx.moveTo(a.cx, a.cy); ctx.lineTo(b.cx, b.cy); ctx.stroke();
+      }
+    }
+
+    const head = snake[0];
+    const { cx, cy } = segCenter(head);
+    const headSize = CELL * 0.96;
+
+    if (snake.length > 1) {
+      const a = segCenter(head), b = segCenter(snake[1]);
+      ctx.beginPath();
+      ctx.strokeStyle = headColor;
+      ctx.lineWidth = headSize * 0.8;
+      ctx.lineCap = 'round';
+      ctx.moveTo(a.cx, a.cy); ctx.lineTo(b.cx, b.cy); ctx.stroke();
+    }
+
+    ctx.save();
+    ctx.shadowColor = headColor;
+    ctx.shadowBlur = 8;
+    roundRectPath(cx - headSize / 2, cy - headSize / 2, headSize, headSize, headSize * 0.42);
+    ctx.fillStyle = headColor;
+    ctx.fill();
+    ctx.restore();
+
+    const flick = Math.sin(performance.now() / 90) > 0.2;
+    if (flick && !gameOver) {
+      const tipX = cx + dir.x * (headSize / 2 + 9);
+      const tipY = cy + dir.y * (headSize / 2 + 9);
+      const baseX = cx + dir.x * (headSize / 2 - 1);
+      const baseY = cy + dir.y * (headSize / 2 - 1);
+      const perpX = -dir.y, perpY = dir.x;
+      ctx.strokeStyle = '#ff5d8f';
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(baseX, baseY); ctx.lineTo(tipX, tipY);
+      ctx.moveTo(tipX, tipY); ctx.lineTo(tipX + perpX * 3 - dir.x * 3, tipY + perpY * 3 - dir.y * 3);
+      ctx.moveTo(tipX, tipY); ctx.lineTo(tipX - perpX * 3 - dir.x * 3, tipY - perpY * 3 - dir.y * 3);
+      ctx.stroke();
+    }
+
+    const eyeOffsetForward = headSize * 0.16;
+    const eyeOffsetSide = headSize * 0.22;
+    const perpX = -dir.y, perpY = dir.x;
+    const eyeBaseX = cx + dir.x * eyeOffsetForward;
+    const eyeBaseY = cy + dir.y * eyeOffsetForward;
+    [1, -1].forEach(side => {
+      const ex = eyeBaseX + perpX * eyeOffsetSide * side;
+      const ey = eyeBaseY + perpY * eyeOffsetSide * side;
+      ctx.beginPath(); ctx.fillStyle = '#0b0e14'; ctx.arc(ex, ey, headSize * 0.11, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.fillStyle = '#ffffff'; ctx.arc(ex + dir.x * 1.2, ey + dir.y * 1.2, headSize * 0.04, 0, Math.PI * 2); ctx.fill();
+    });
+  }
+
+  function showOverlay(title, text, btnLabel, btn2Label) {
+    overlayTitle.textContent = title;
+    overlayText.textContent = text;
+    overlayBtn.textContent = btnLabel;
+    overlayBtn2.textContent = btn2Label;
+    overlay.classList.add('show');
+  }
+  function hideOverlay() { overlay.classList.remove('show'); }
+
+  function endGame(title, text) {
+    running = false;
+    gameOver = true;
+    clearSession();
+    statusDot.classList.add('off');
+    statusText.textContent = 'STOPPED';
+    saveHighScore({ score, level, length: snake.length, date: new Date().toLocaleDateString(), daily: isDaily });
+    if (isDaily && dailyMeta) setDailyBest(dailyMeta.date, score);
+    showOverlay(title, text, 'PLAY AGAIN', 'MENU');
+  }
+
+  function togglePause() {
+    if (gameOver) return;
+    paused = !paused;
+    if (paused) {
+      statusDot.classList.add('off'); statusText.textContent = 'PAUSED';
+      showOverlay('PAUSED', 'Hold position. Resume when ready.', 'RESUME', 'MENU');
+    } else {
+      statusDot.classList.remove('off'); statusText.textContent = 'RUNNING';
+      hideOverlay();
+    }
+  }
+
+  overlayBtn.addEventListener('click', () => {
+    if (gameOver) { const v = isDaily ? { ...todaysVariant().variant } : {}; startGame(isDaily ? { daily: true, dailyDate: dailyMeta.date, variant: v } : {}); }
+    else togglePause();
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (!screens.game.classList.contains('active')) return;
+    if (e.code === 'KeyP') { togglePause(); return; }
+    if (gameOver || paused) return;
+    switch (e.code) {
+      case 'ArrowLeft': queuedDir = { x: -1, y: 0 }; e.preventDefault(); break;
+      case 'ArrowRight': queuedDir = { x: 1, y: 0 }; e.preventDefault(); break;
+      case 'ArrowUp': queuedDir = { x: 0, y: -1 }; e.preventDefault(); break;
+      case 'ArrowDown': queuedDir = { x: 0, y: 1 }; e.preventDefault(); break;
+    }
+  });
+
+  function loop(timestamp) {
+    if (!lastTime) lastTime = timestamp;
+    const delta = timestamp - lastTime;
+    lastTime = timestamp;
+    if (screens.game.classList.contains('active') && running && !paused && !gameOver) {
+      snakeTimer += delta; dropTimer += delta; ballTimer += delta;
+      if (snakeTimer > SNAKE_INTERVAL) { snakeTimer = 0; stepSnake(); }
+      if (!gameOver && dropTimer > dropInterval) { dropTimer = 0; stepFallingPiece(); }
+      if (!gameOver && ballTimer > BALL_SPAWN_INTERVAL) { ballTimer = 0; spawnBall(); }
+      draw();
+    } else if (screens.game.classList.contains('active') && (paused || gameOver)) {
+      draw();
+    }
+    requestAnimationFrame(loop);
+  }
+
+  requestAnimationFrame(loop);
+  showScreen('menu');
+})();
+</script>
+
+<script>
+(function() {
+  const screens = document.querySelectorAll('.fun-screen');
+  if (!screens.length) return;
+  const colors = ['#4fd8e0', '#ff5d8f', '#8be04f', '#8b7bff', '#ffb32e', '#ff9a3e'];
+
+  function snakeSVG(color) {
+    return '<svg viewBox="0 0 120 34" width="80" height="23" xmlns="http://www.w3.org/2000/svg">' +
+      '<path d="M4,17 Q16,3 28,17 T52,17 T76,17 T96,17" fill="none" stroke="' + color + '" stroke-width="10" stroke-linecap="round"/>' +
+      '<circle cx="100" cy="17" r="9.5" fill="' + color + '"/>' +
+      '<circle cx="103.5" cy="13.5" r="2.1" fill="#fff"/>' +
+      '<circle cx="104.3" cy="13.5" r="1" fill="#20203a"/>' +
+      '<path d="M109,17 L116,14 M109,17 L116,20" stroke="#e83a5c" stroke-width="1.5" stroke-linecap="round"/>' +
+      '</svg>';
+  }
+
+  const tetrominoes = {
+    I: [[0,0],[1,0],[2,0],[3,0]],
+    O: [[0,0],[1,0],[0,1],[1,1]],
+    T: [[0,0],[1,0],[2,0],[1,1]],
+    S: [[1,0],[2,0],[0,1],[1,1]],
+    Z: [[0,0],[1,0],[1,1],[2,1]],
+    L: [[0,0],[0,1],[0,2],[1,2]],
+    J: [[1,0],[1,1],[1,2],[0,2]]
+  };
+  const shapeKeys = Object.keys(tetrominoes);
+
+  function blockSVG(color) {
+    const cells = tetrominoes[shapeKeys[Math.floor(Math.random() * shapeKeys.length)]];
+    const cell = 13, gap = 2;
+    let maxX = 0, maxY = 0;
+    cells.forEach(([x, y]) => { maxX = Math.max(maxX, x); maxY = Math.max(maxY, y); });
+    const w = (maxX + 1) * (cell + gap), h = (maxY + 1) * (cell + gap);
+    let rects = '';
+    cells.forEach(([x, y]) => {
+      rects += '<rect x="' + (x * (cell + gap)) + '" y="' + (y * (cell + gap)) + '" width="' + cell + '" height="' + cell +
+        '" rx="3" fill="' + color + '" stroke="rgba(0,0,0,0.25)" stroke-width="1"/>';
+    });
+    return '<svg viewBox="0 0 ' + w + ' ' + h + '" width="' + w + '" height="' + h + '" xmlns="http://www.w3.org/2000/svg">' + rects + '</svg>';
+  }
+
+  screens.forEach(function(screen) {
+    const snakeCount = 6;
+    for (let i = 0; i < snakeCount; i++) {
+      const dir = Math.random() < 0.5 ? 'right' : 'left';
+      const el = document.createElement('div');
+      el.className = 'menu-snake ' + (dir === 'left' ? 'face-left' : '');
+      el.innerHTML = snakeSVG(colors[Math.floor(Math.random() * colors.length)]);
+      el.style.top = (6 + Math.random() * 82) + '%';
+      const duration = 9 + Math.random() * 10;
+      el.style.animationName = dir === 'right' ? 'menuSnakeRight' : 'menuSnakeLeft';
+      el.style.animationDuration = duration + 's';
+      el.style.animationDelay = (-Math.random() * duration) + 's';
+      el.style.opacity = 0.55 + Math.random() * 0.35;
+      const scale = 0.7 + Math.random() * 0.7;
+      el.style.transform = 'scale(' + scale + ')';
+      screen.appendChild(el);
+    }
+
+    const blockCount = 7;
+    for (let i = 0; i < blockCount; i++) {
+      const el = document.createElement('div');
+      el.className = 'menu-block';
+      el.innerHTML = blockSVG(colors[Math.floor(Math.random() * colors.length)]);
+      el.style.left = (2 + Math.random() * 92) + '%';
+      const duration = 7 + Math.random() * 9;
+      el.style.animationDuration = duration + 's';
+      el.style.animationDelay = (-Math.random() * duration) + 's';
+      el.style.opacity = 0.55 + Math.random() * 0.35;
+      const scale = 0.7 + Math.random() * 0.8;
+      el.style.transform = 'scale(' + scale + ')';
+      screen.appendChild(el);
+    }
+  });
+})();
+</script>
+</body>
+</html>
