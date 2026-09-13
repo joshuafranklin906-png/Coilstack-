@@ -1093,10 +1093,10 @@
     if (e.code === 'KeyP') { togglePause(); return; }
     if (gameOver || paused) return;
     switch (e.code) {
-      case 'ArrowLeft': queuedDir = { x: -1, y: 0 }; e.preventDefault(); break;
-      case 'ArrowRight': queuedDir = { x: 1, y: 0 }; e.preventDefault(); break;
-      case 'ArrowUp': queuedDir = { x: 0, y: -1 }; e.preventDefault(); break;
-      case 'ArrowDown': queuedDir = { x: 0, y: 1 }; e.preventDefault(); break;
+     case 'ArrowLeft': case 'KeyA': queuedDir = { x: -1, y: 0 }; e.preventDefault(); break;
+     case 'ArrowRight': case 'KeyD': queuedDir = { x: 1, y: 0 }; e.preventDefault(); break;
+     case 'ArrowUp': case 'KeyW': queuedDir = { x: 0, y: -1 }; e.preventDefault(); break;
+     case 'ArrowDown': case 'KeyS': queuedDir = { x: 0, y: 1 }; e.preventDefault(); break;
     }
   });
 
